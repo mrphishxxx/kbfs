@@ -6,7 +6,10 @@
 
 package test
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // bob renames a non-conflicting file into a new directory while unstaged
 func TestCrUnmergedRenameIntoNewDir(t *testing.T) {
@@ -692,6 +695,38 @@ func TestCrUnmergedMoveOfRemovedFile(t *testing.T) {
 		as(alice,
 			lsdir("a/", m{"c$": "FILE"}),
 			read("a/c", "hello"),
+		),
+	)
+}
+
+// bob makes, sets the mtime, and remove a file.  Regression test for
+// KBFS-1163.
+func TestCrUnmergedSetAttrOfAddedAndRemovedFile(t *testing.T) {
+	test(t,
+		users("alice", "bob"),
+		as(alice,
+			mkdir("a/b/c"),
+			mkfile("a/b/c/d", "hello"),
+		),
+		as(bob,
+			disableUpdates(),
+		),
+		as(alice,
+			rm("a/b/c/d"),
+			rm("a/b/c"),
+			rm("a/b"),
+			rm("a"),
+		),
+		as(bob, noSync(),
+			setmtime("a/b/c", time.Now().Add(1*time.Minute)),
+			mkfile("e", "world"),
+			reenableUpdates(),
+			lsdir("", m{"e$": "FILE"}),
+			read("e", "world"),
+		),
+		as(alice,
+			lsdir("", m{"e$": "FILE"}),
+			read("e", "world"),
 		),
 	)
 }
