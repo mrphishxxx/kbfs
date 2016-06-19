@@ -148,12 +148,20 @@ func (cc *crChain) isFile() bool {
 		return false
 	}
 
-	// If the first op is setAttr or sync, this is a file chain.
-	switch cc.ops[0].(type) {
-	case *syncOp:
-		return true
-	case *setAttrOp:
-		return true
+	// If any op is setAttr (ex or size) or sync, this is a file
+	// chain.  If it only has a setAttr/mtime, we don't know what it
+	// is, just return false.
+	for _, op := range cc.ops {
+		switch realOp := op.(type) {
+		case *syncOp:
+			return true
+		case *setAttrOp:
+			if realOp.Attr != mtimeAttr {
+				return true
+			}
+		default:
+			return false
+		}
 	}
 	return false
 }

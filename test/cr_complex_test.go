@@ -701,7 +701,7 @@ func TestCrUnmergedMoveOfRemovedFile(t *testing.T) {
 
 // bob makes, sets the mtime, and remove a file.  Regression test for
 // KBFS-1163.
-func TestCrUnmergedSetAttrOfAddedAndRemovedFile(t *testing.T) {
+func TestCrUnmergedSetAttrOfAddedAndRemovedDir(t *testing.T) {
 	test(t,
 		users("alice", "bob"),
 		as(alice,
