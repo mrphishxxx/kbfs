@@ -1678,10 +1678,6 @@ func collapseActions(unmergedChains *crChains,
 	mergedPaths map[BlockPointer]path,
 	actionMap map[BlockPointer]crActionList) {
 	for unmergedMostRecent, chain := range unmergedChains.byMostRecent {
-		if !chain.isFile() {
-			continue
-		}
-
 		// Find the parent directory path and combine
 		p, ok := mergedPaths[unmergedMostRecent]
 		if !ok {
@@ -1693,13 +1689,42 @@ func collapseActions(unmergedChains *crChains,
 			continue
 		}
 
+		// If this is a directory but with setAttr(mtime) actions,
+		// just those action should be collapsed into the parent.
+		if !chain.isFile() {
+			var setMtimeActions crActionList
+			var otherDirActions crActionList
+			for _, action := range fileActions {
+				if cAttr, ok := action.(*copyUnmergedAttrAction); ok &&
+					cAttr.attr[0] == mtimeAttr && !cAttr.moved {
+					cAttr.moved = true
+					setMtimeActions = append(setMtimeActions, cAttr)
+				} else {
+					otherDirActions = append(otherDirActions, action)
+				}
+			}
+			if len(setMtimeActions) == 0 {
+				// A directory with no mtime actions, so treat it
+				// normally.
+				continue
+			}
+			fileActions = setMtimeActions
+			if len(otherDirActions) > 0 {
+				actionMap[p.tailPointer()] = otherDirActions
+			} else {
+				delete(actionMap, p.tailPointer())
+			}
+		}
+
 		parentPath := *p.parentPath()
 		mergedParent := parentPath.tailPointer()
 		parentActions := actionMap[mergedParent]
 		combinedActions := append(parentActions, fileActions...)
 		actionMap[mergedParent] = combinedActions
-		mergedPaths[unmergedMostRecent] = parentPath
-		delete(actionMap, p.tailPointer())
+		if chain.isFile() {
+			mergedPaths[unmergedMostRecent] = parentPath
+			delete(actionMap, p.tailPointer())
+		}
 	}
 
 	for ptr, actions := range actionMap {
@@ -1953,8 +1978,8 @@ func (cr *ConflictResolver) doActions(ctx context.Context,
 				}
 				uBlock := unmergedBlock
 				if swap {
-					cr.log.CDebugf(ctx, "Swapping out block %v for %v",
-						newPtr, unmergedPath.tailPointer())
+					cr.log.CDebugf(ctx, "Swapping out block %v for %v (action: %v)",
+						newPtr, unmergedPath.tailPointer(), action)
 					if newPtr == zeroPtr {
 						// Use this merged block
 						uBlock = mergedBlock

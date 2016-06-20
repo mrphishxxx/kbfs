@@ -701,7 +701,8 @@ func TestCrUnmergedMoveOfRemovedFile(t *testing.T) {
 
 // bob makes, sets the mtime, and remove a file.  Regression test for
 // KBFS-1163.
-func TestCrUnmergedSetAttrOfAddedAndRemovedDir(t *testing.T) {
+func TestCrUnmergedSetMtimeOfRemovedDir(t *testing.T) {
+	targetMtime := time.Now().Add(1 * time.Minute)
 	test(t,
 		users("alice", "bob"),
 		as(alice,
@@ -718,14 +719,22 @@ func TestCrUnmergedSetAttrOfAddedAndRemovedDir(t *testing.T) {
 			rm("a"),
 		),
 		as(bob, noSync(),
-			setmtime("a/b/c", time.Now().Add(1*time.Minute)),
+			setmtime("a/b/c", targetMtime),
 			mkfile("e", "world"),
 			reenableUpdates(),
-			lsdir("", m{"e$": "FILE"}),
+			lsdir("", m{"a$": "DIR", "e$": "FILE"}),
+			lsdir("a", m{"b$": "DIR"}),
+			lsdir("a/b", m{"c$": "DIR"}),
+			lsdir("a/b/c", m{}),
+			mtime("a/b/c", targetMtime),
 			read("e", "world"),
 		),
 		as(alice,
-			lsdir("", m{"e$": "FILE"}),
+			lsdir("", m{"a$": "DIR", "e$": "FILE"}),
+			lsdir("a", m{"b$": "DIR"}),
+			lsdir("a/b", m{"c$": "DIR"}),
+			lsdir("a/b/c", m{}),
+			mtime("a/b/c", targetMtime),
 			read("e", "world"),
 		),
 	)

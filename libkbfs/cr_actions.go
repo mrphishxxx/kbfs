@@ -85,7 +85,7 @@ func (cuea *copyUnmergedEntryAction) swapUnmergedBlock(
 	}
 
 	// If:
-	//   * The entry BlockPointer has no unmerged chain with no (or
+	//   * The entry BlockPointer has an unmerged chain with no (or
 	//     attr-only) ops; AND
 	//   * The entry BlockPointer does have a merged chain
 	// copy the merged entry instead by fetching the block for its merged
@@ -93,6 +93,9 @@ func (cuea *copyUnmergedEntryAction) swapUnmergedBlock(
 	// the "sizeAttr" fields.
 	ptr := unmergedEntry.BlockPointer
 	if chain, ok := unmergedChains.byMostRecent[ptr]; ok {
+		if !chain.isFile() {
+			return false, zeroPtr, nil
+		}
 		// If the chain has only setAttr ops, we still want to do the
 		// swap, but we need to preserve those unmerged attr changes.
 		for _, op := range chain.ops {
@@ -283,6 +286,7 @@ type copyUnmergedAttrAction struct {
 	fromName string
 	toName   string
 	attr     []attrChange
+	moved    bool
 }
 
 func (cuaa *copyUnmergedAttrAction) swapUnmergedBlock(
@@ -297,11 +301,13 @@ func (cuaa *copyUnmergedAttrAction) do(ctx context.Context,
 	// Find the unmerged entry
 	unmergedEntry, ok := unmergedBlock.Children[cuaa.fromName]
 	if !ok {
+		fmt.Printf("NONE 1 %s!\n", cuaa.fromName)
 		return NoSuchNameError{cuaa.fromName}
 	}
 
 	mergedEntry, ok := mergedBlock.Children[cuaa.toName]
 	if !ok {
+		fmt.Println("NONE 2!")
 		return NoSuchNameError{cuaa.toName}
 	}
 	for _, attr := range cuaa.attr {
